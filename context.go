@@ -1,32 +1,41 @@
 package rclgo
 
 import (
-	"github.com/richardrigby/rclgo/err"
-	"github.com/richardrigby/rclgo/internal"
-	"github.com/richardrigby/rclgo/types"
+	cwrap "github.com/rclgo/rclgo/internal"
 )
 
 // Context encapsulates the non-global state of an init/shutdown cycle.
 type Context struct {
 	rclContext cwrap.RclContextPtr
+	init       bool
 }
 
-// NewZeroInitializedContext returns a zero initialization context object.
-func NewZeroInitializedContext() Context {
+var context Context
+
+func GetDefaultContext() Context {
+	if context.init == false {
+		context = newZeroInitializedContext()
+		context.Init()
+		context.init = true
+	}
+	return context
+}
+
+// newZeroInitializedContext returns a zero initialization context object.
+func newZeroInitializedContext() Context {
 	ctxPtr := cwrap.GetZeroInitializedContextPtr()
-	return Context{rclContext: ctxPtr}
+	return Context{rclContext: ctxPtr, init: true}
 }
 
 // Init finalizes a context.
 func (ctx *Context) Init() error {
-	var ret int
 
 	var opts = cwrap.RclGetZeroInitializedInitOptions()
 	alloc := cwrap.RclGetDefaultAllocator()
 
-	ret = cwrap.RclInitOptionsInit(&opts, alloc)
-	if ret != types.Ok {
-		return err.NewErr("RclInitOptionsInit", ret)
+	ret := cwrap.RclInitOptionsInit(&opts, alloc)
+	if ret != cwrap.Ok {
+		return NewErr("RclInitOptionsInit", ret)
 	}
 
 	ret = cwrap.RclInit(
@@ -35,13 +44,13 @@ func (ctx *Context) Init() error {
 		&opts,
 		ctx.rclContext,
 	)
-	if ret != types.Ok {
-		return err.NewErr("RclInit", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclInit", ret)
 	}
 
 	ret = cwrap.RclInitOptionsFini(&opts)
-	if ret != types.Ok {
-		return err.NewErr("RclInitOptionsFini", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclInitOptionsFini", ret)
 	}
 
 	return nil
@@ -50,8 +59,8 @@ func (ctx *Context) Init() error {
 // Fini finalizes a context.
 func (ctx *Context) Fini() error {
 	ret := cwrap.RclContextFini(ctx.rclContext)
-	if ret != types.Ok {
-		return err.NewErr("RclContextFini", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclContextFini", ret)
 	}
 
 	return nil
@@ -60,8 +69,8 @@ func (ctx *Context) Fini() error {
 // Shutdown shuts down the context.
 func (ctx *Context) Shutdown() error {
 	ret := cwrap.RclShutdown(ctx.rclContext)
-	if ret != types.Ok {
-		return err.NewErr("RclShutdown", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclShutdown", ret)
 	}
 
 	return nil

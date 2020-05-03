@@ -1,9 +1,7 @@
 package rclgo
 
 import (
-	"github.com/richardrigby/rclgo/err"
-	cwrap "github.com/richardrigby/rclgo/internal"
-	"github.com/richardrigby/rclgo/types"
+	cwrap "github.com/rclgo/rclgo/internal"
 )
 
 type Publisher struct {
@@ -14,7 +12,7 @@ type PublisherOptions struct {
 	rclPublisherOptions *cwrap.RclPublisherOptions
 }
 
-func NewZeroInitializedPublisher() Publisher {
+func newZeroInitializedPublisher() Publisher {
 	zeroPublisher := cwrap.RclGetZeroInitializedPublisher()
 	return Publisher{&zeroPublisher}
 }
@@ -30,45 +28,45 @@ func (p *Publisher) GetTopicName() string {
 
 func (p *Publisher) Init(
 	publisherOptions PublisherOptions,
-	node Node,
+	node *Node,
 	topicName string,
-	msg types.MessageTypeSupport,
+	typeSupport MessageTypeSupport,
 ) error {
 
 	ret := cwrap.RclPublisherInit(
 		p.rclPublisher,
 		node.rclNode,
-		msg.ROSIdlMessageTypeSupport,
+		typeSupport.RosidlMessageTypeSupport,
 		topicName,
 		publisherOptions.rclPublisherOptions,
 	)
 
-	if ret != types.Ok {
-		return err.NewErr("RclInitOptionsInit", int(ret))
+	if ret != cwrap.Ok {
+		return NewErr("RclInitOptionsInit", ret)
 	}
 
 	return nil
 }
 
-func (p *Publisher) PublisherFini(node Node) error {
+func (p *Publisher) Fini(node Node) error {
 	ret := cwrap.RclPublisherFini(p.rclPublisher, node.rclNode)
-	if ret != types.Ok {
-		return err.NewErr("RclPublisherFini", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclPublisherFini", ret)
 	}
 
 	return nil
 }
 
-func (p *Publisher) Publish(msg types.MessageTypeSupport, data types.MessageData) error {
+func (p *Publisher) Publish(msg RosMessage) error {
 
 	ret := cwrap.RclPublish(
 		p.rclPublisher,
-		msg.ROSIdlMessageTypeSupport,
-		data.Data,
+		msg.Pointer(),
+		nil,
 	)
 
-	if ret != types.Ok {
-		return err.NewErr("RclPublish", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclPublish", ret)
 	}
 
 	return nil

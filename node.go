@@ -1,14 +1,17 @@
 package rclgo
 
 import (
-	"github.com/richardrigby/rclgo/err"
-	cwrap "github.com/richardrigby/rclgo/internal"
-	"github.com/richardrigby/rclgo/types"
+	"fmt"
+
+	cwrap "github.com/rclgo/rclgo/internal"
 )
 
 // Node is a structure that encapsulates a ROS Node.
 type Node struct {
-	rclNode *cwrap.RclNode
+	rclNode       *cwrap.RclNode
+	executor      *Executor
+	publishers    map[*Publisher]struct{} // Using map as a set
+	subscriptions map[*Subscription]struct{}
 }
 
 // NodeOptions is a structure that encapsulates the options for creating an
@@ -17,8 +20,24 @@ type NodeOptions struct {
 	rclNodeOptions *cwrap.RclNodeOptions
 }
 
-// NewZeroInitializedNode returns an RclNode with members initialized to `NULL`.
-func NewZeroInitializedNode() Node {
+// NewNode initializes an returns a new ROS2 node.
+func NewNode(name, namespace string) (Node, error) {
+	node := cwrap.RclGetZeroInitializedNode()
+	opts := cwrap.RclNodeGetDefaultOptions()
+	ctx := GetDefaultContext()
+	err := cwrap.RclNodeInit(&node, name, namespace, ctx.rclContext, &opts)
+	if err != cwrap.Ok {
+		return Node{rclNode: &node}, NewErr("RclNodeInit", err)
+	}
+	return Node{
+		rclNode:       &node,
+		publishers:    make(map[*Publisher]struct{}),
+		subscriptions: make(map[*Subscription]struct{}),
+	}, nil
+}
+
+// newZeroInitializedNode returns an RclNode with members initialized to `NULL`.
+func newZeroInitializedNode() Node {
 	zeroNode := cwrap.RclGetZeroInitializedNode()
 	return Node{rclNode: &zeroNode}
 }
@@ -30,7 +49,12 @@ func NewNodeDefaultOptions() NodeOptions {
 }
 
 // Init initialize a ROS node.
-func (n *Node) Init(name string, namespace string, ctx Context, nodeOptions NodeOptions) error {
+func (n *Node) Init(
+	name string,
+	namespace string,
+	ctx Context,
+	nodeOptions NodeOptions,
+) error {
 	ret := cwrap.RclNodeInit(
 		n.rclNode,
 		name,
@@ -38,21 +62,33 @@ func (n *Node) Init(name string, namespace string, ctx Context, nodeOptions Node
 		ctx.rclContext,
 		nodeOptions.rclNodeOptions,
 	)
-	if ret != types.Ok {
-		return err.NewErr("RclNodeInit", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclNodeInit", ret)
 	}
 
 	return nil
 }
 
 // Fini finalizes an RclNode.
-func (n *Node) Fini() error {
-	ret := cwrap.RclNodeFini(n.rclNode)
-	if ret != types.Ok {
-		return err.NewErr("RclNodeFini", ret)
+func (n *Node) Fini() (errs []error) {
+	for pub := range n.publishers {
+		err := pub.Fini(*n)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	for sub := range n.subscriptions {
+		err := sub.Fini(*n)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	err := cwrap.RclNodeFini(n.rclNode)
+	if err != cwrap.Ok {
+		errs = append(errs, NewErr("RclNodeFini", err))
 	}
 
-	return nil
+	return errs
 }
 
 // IsValid returns `true` if the node is valid, else `false`.
@@ -96,8 +132,8 @@ func (n *Node) GetOptions() NodeOptions {
 func (n *Node) GetDomainID() (uint, error) {
 	var domainID uint
 	ret := cwrap.RclNodeGetDomainID(n.rclNode, &domainID)
-	if ret != types.Ok {
-		return domainID, err.NewErr("RclNodeGetDomainID", ret)
+	if ret != cwrap.Ok {
+		return domainID, NewErr("RclNodeGetDomainID", ret)
 	}
 
 	return domainID, nil
@@ -107,8 +143,8 @@ func (n *Node) GetDomainID() (uint, error) {
 // (for RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE)
 func (n *Node) AssertLiveliness() error {
 	ret := cwrap.RclNodeAssertLiveliness(n.rclNode)
-	if ret != types.Ok {
-		return err.NewErr("RclNodeAssertLiveliness", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclNodeAssertLiveliness", ret)
 	}
 
 	return nil
@@ -128,13 +164,60 @@ func (n *Node) GetRclInstanceID() uint64 {
 
 // GetGraphGuardCondition returns a guard condition which is triggered when the
 // ROS graph changes.
-// func (n *Node) GetGraphGuardCondition() GuardCondition {
-// 	guard := cwrap.RclNodeGetGraphGuardCondition(n.rclNode)
-// 	return GuardCondition{guard}
-// }
+func (n *Node) GetGraphGuardCondition() GuardCondition {
+	guard := cwrap.RclNodeGetGraphGuardCondition(n.rclNode)
+	return GuardCondition{rclGuardCondition: guard}
+}
 
 // GetLoggerName returns the logger name of the node.
 func (n *Node) GetLoggerName() string {
 	var ret string = cwrap.RclNodeGetLoggerName(n.rclNode)
 	return ret
+}
+
+//
+func (n *Node) SetExecutor(executor *Executor) {
+	if executor == n.executor {
+		return
+	}
+	if n.executor != nil {
+		n.executor.RemoveNode(n)
+	}
+	if executor != nil {
+		executor.AddNode(n)
+	}
+	n.executor = executor
+}
+
+//
+func (n *Node) CreateSubscription(
+	msg RosMessage,
+	topic string,
+	callback func(RosMessage),
+) error {
+	sub := newZeroInitializedSubscription()
+	opt := NewSubscriptionDefaultOptions()
+	err := sub.Init(opt, n, topic, msg.TypeSupport())
+	if err != nil {
+		return fmt.Errorf("Subscriber.Init() error:\n%s", err.Error())
+	}
+	sub.callback = callback
+	sub.msg = msg
+	n.subscriptions[&sub] = struct{}{}
+	return nil
+}
+
+//
+func (n *Node) CreatePublisher(
+	msg RosMessage,
+	topic string,
+) (Publisher, error) {
+	pub := newZeroInitializedPublisher()
+	opt := NewPublisherDefaultOptions()
+	err := pub.Init(opt, n, topic, msg.TypeSupport())
+	if err != nil {
+		return pub, fmt.Errorf("Publisher.Init() error:\n%s", err.Error())
+	}
+	n.publishers[&pub] = struct{}{}
+	return pub, nil
 }

@@ -4,5 +4,4 @@ package cwrap
 // #include <rcl/rcl.h>
 import "C"
 
-//
-type RclSerializedMessage C.rcl_serialized_message_t
+type RmwSubscriptionAllocation C.rmw_subscription_allocation_t

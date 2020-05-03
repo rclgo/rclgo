@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/richardrigby/rclgo"
-	"github.com/richardrigby/rclgo/types"
+	"github.com/rclgo/rclgo"
+	"github.com/rclgo/stdmsgs"
 )
 
 // func BenchmarkFoo(b *testing.B) {
@@ -42,8 +42,8 @@ import (
 // 		// myPubOpts := GetPublisherDefaultOptions()
 
 // 		//Create the msg type
-// 		var myMsg types.StdMsgsString
-// 		myMsg.InitMessage()
+// 		var myMsg stdmsgs.String
+// 		myMsg.Init()
 
 // 		// fmt.Printf("Creating the publisher! \n")
 // 		//Initializing the publisher
@@ -58,7 +58,7 @@ import (
 
 // 		// fmt.Printf("Shutting down!! \n")
 
-// 		myMsg.DestroyMessage()
+// 		myMsg.Destroy()
 // 		// PublisherFini(myPub, myNode)
 // 		// node.NodeFini(myNode)
 // 		// rcl.Shutdown()
@@ -82,34 +82,19 @@ func TestPublisherStringMsg(t *testing.T) {
 		}
 	}()
 
-	// Initialization
-	myContext := rclgo.NewZeroInitializedContext()
-	err := myContext.Init()
+	myNode, err := rclgo.NewNode("GoPublisher", "")
 	if err != nil {
-		t.Fatalf("rcl.Init failed: %s\n", err)
-	}
-	myNode := rclgo.NewZeroInitializedNode()
-	myNodeOpts := rclgo.NewNodeDefaultOptions()
-
-	fmt.Printf("Creating the node! \n")
-	err = myNode.Init("GoPublisher", "", myContext, myNodeOpts)
-	if err != nil {
-		t.Fatalf("NodeInit failed: %s\n", err)
+		t.Fatalf("rclgo.NewNode(): %s\n", err)
 	}
 
-	//Create the publisher
-	myPub := rclgo.NewZeroInitializedPublisher()
-	myPubOpts := rclgo.NewPublisherDefaultOptions()
+	// Create the msg type
+	var myMsg stdmsgs.String
+	myMsg.Init()
 
-	//Create the msg type
-	var myMsg types.StdMsgsString
-	myMsg.InitMessage()
-
-	fmt.Printf("Creating the publisher! \n")
-	//Initializing the publisher
-	err = myPub.Init(myPubOpts, myNode, "/myGoTopic", myMsg.GetMessage())
+	// Create the publisher
+	myPub, err := myNode.CreatePublisher(myMsg, "/myGoTopic")
 	if err != nil {
-		t.Fatalf("PublisherInit failed: %s\n", err)
+		t.Fatalf("myNode.CreatePublisher(): %s\n", err)
 	}
 
 	index := 0
@@ -118,12 +103,11 @@ loop:
 		//Update my msg
 		myMsg.SetText("Greetings from GO! #" + strconv.Itoa(index))
 		//Publish the message
-		err := myPub.Publish(myMsg.GetMessage(), myMsg.GetData())
-
+		err := myPub.Publish(myMsg)
 		if err != nil {
-			t.Fatalf("Publish failed: %s\n", err)
+			t.Fatalf("myPub.Publish(): %s\n", err)
 		} else {
-			fmt.Printf("(Publisher) Published: %s\n", myMsg.GetDataAsString())
+			fmt.Printf("(Publisher) Published: %s\n", myMsg.DataAsString())
 		}
 		time.Sleep(500 * time.Millisecond)
 		index++
@@ -141,20 +125,29 @@ loop:
 
 	fmt.Printf("Shutting down!! \n")
 
-	myMsg.DestroyMessage()
-	err = myPub.PublisherFini(myNode)
+	err = myMsg.Destroy()
 	if err != nil {
-		t.Fatalf("PublishFini: %s\n", err)
+		t.Fatalf("myMsg.Destroy(): %s\n", err)
 	}
 
-	err = myNode.Fini()
-	if err != nil {
-		t.Fatalf("NodeFini: %s\n", err)
+	// Publisher.Fini() called within myNode.Fini()
+	// err = myPub.Fini(myNode)
+	// if err != nil {
+	// 	t.Fatalf("myPub.Fini(): %s\n", err)
+	// }
+
+	errs := myNode.Fini()
+	if len(errs) != 0 {
+		var s = "myNode.Fini():\n"
+		for _, err := range errs {
+			s += err.Error() + "\n"
+		}
+		t.Fatalf(s)
 	}
 
-	err = myContext.Shutdown()
+	err = rclgo.Shutdown()
 	if err != nil {
-		t.Fatalf("rcl.Shutdown: %s\n", err)
+		t.Fatalf("rclgo.Shutdown(): %s\n", err)
 	}
 }
 
@@ -187,8 +180,8 @@ loop:
 // 	myPubOpts := GetPublisherDefaultOptions()
 
 // 	//Create the msg type
-// 	var myMsg types.StdMsgsInt8
-// 	myMsg.InitMessage()
+// 	var myMsg stdmsgs.Int8
+// 	myMsg.Init()
 // 	myMsg.SetInt8(32)
 
 // 	fmt.Printf("Creating the publisher! \n")
@@ -204,7 +197,7 @@ loop:
 // 		//Publish the message
 // 		retRCL := Publish(myPub, myMsg.GetMessage(), myMsg.GetData())
 
-// 		if retRCL == types.Ok {
+// 		if retRCL == cwrap.Ok {
 // 			var value string
 // 			fmt.Sprintf("%v", value)
 
@@ -226,7 +219,7 @@ loop:
 
 // 	fmt.Printf("Shutting down!! \n")
 
-// 	myMsg.DestroyMessage()
+// 	myMsg.Destroy()
 // 	PublisherFini(myPub, myNode)
 // 	node.NodeFini(myNode)
 // 	rcl.Shutdown()
@@ -262,8 +255,8 @@ loop:
 // 	myPubOpts := GetPublisherDefaultOptions()
 
 // 	//Create the msg type
-// 	var myMsg types.StdMsgsFloat64
-// 	myMsg.InitMessage()
+// 	var myMsg stdmsgs.Float64
+// 	myMsg.Init()
 // 	myMsg.SetFloat64(32.0)
 
 // 	fmt.Printf("Creating the publisher! \n")
@@ -279,7 +272,7 @@ loop:
 // 		//Publish the message
 // 		retRCL := Publish(myPub, myMsg.GetMessage(), myMsg.GetData())
 
-// 		if retRCL == types.Ok {
+// 		if retRCL == cwrap.Ok {
 // 			var value string
 // 			fmt.Sprintf("%v", value)
 
@@ -301,7 +294,7 @@ loop:
 
 // 	fmt.Printf("Shutting down!! \n")
 
-// 	myMsg.DestroyMessage()
+// 	myMsg.Destroy()
 // 	PublisherFini(myPub, myNode)
 // 	node.NodeFini(myNode)
 // 	rcl.Shutdown()

@@ -1,22 +1,27 @@
 package rclgo
 
 import (
-	"github.com/richardrigby/rclgo/err"
-	cwrap "github.com/richardrigby/rclgo/internal"
-	"github.com/richardrigby/rclgo/types"
+	cwrap "github.com/rclgo/rclgo/internal"
 )
 
 type WaitSet struct {
 	rclWaitSet *cwrap.RclWaitSet
 }
 
-func NewZeroInitializedWaitSet() WaitSet {
+//
+func NewWaitSet() WaitSet {
+	return newZeroInitializedWaitSet()
+}
+
+//
+func newZeroInitializedWaitSet() WaitSet {
 	zeroWaitset := cwrap.RclGetZeroInitializedWaitSet()
 	return WaitSet{&zeroWaitset}
 }
 
-func (w *WaitSet) WaitSetInit(
-	numSubs, numGuards, numTimers, numClients, numServices, numEvents int,
+//
+func (w *WaitSet) Init(
+	numSubs, numGuards, numTimers, numClients, numServices, numEvents uint,
 	ctx cwrap.RclContextPtr,
 	allo cwrap.RclAllocator,
 ) error {
@@ -31,45 +36,56 @@ func (w *WaitSet) WaitSetInit(
 		ctx,
 		allo,
 	)
-	if ret != types.Ok {
-		return err.NewErr("RclWaitSetInit", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclWaitSetInit", ret)
 	}
 
 	return nil
 }
 
+//
 func (w *WaitSet) Fini() error {
 	ret := cwrap.RclWaitSetFini(w.rclWaitSet)
-	if ret != types.Ok {
-		return err.NewErr("RclWaitSetFini", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclWaitSetFini", ret)
 	}
 
 	return nil
 }
 
+//
 func (w *WaitSet) GetAllocator(allocator *cwrap.RclAllocator) error {
 	ret := cwrap.RclWaitSetGetAllocator(w.rclWaitSet, allocator)
-	if ret != types.Ok {
-		return err.NewErr("RclWaitSetGetAllocator", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclWaitSetGetAllocator", ret)
 	}
 
 	return nil
 }
 
-func (w *WaitSet) WaitSetAddsubscription(subscription Subscription) error {
-	ret := cwrap.RclWaitSetAddSubscription(w.rclWaitSet, subscription.rclSubscription, nil)
-	if ret != types.Ok {
-		return err.NewErr("RclWaitSetAddSubscription", ret)
+//
+func (w *WaitSet) AddSubscription(rclSubscription *cwrap.RclSubscription) error {
+	ret := cwrap.RclWaitSetAddSubscription(w.rclWaitSet, rclSubscription, nil)
+	if ret != cwrap.Ok {
+		return NewErr("RclWaitSetAddSubscription", ret)
 	}
-
 	return nil
 }
 
-func (w *WaitSet) WaitSetClearSubscriptions() error {
+//
+func (w *WaitSet) Clear() error {
 	ret := cwrap.RclWaitSetClear(w.rclWaitSet)
-	if ret != types.Ok {
-		return err.NewErr("RclWaitSetClear", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclWaitSetClear", ret)
 	}
+	return nil
+}
 
+//
+func (w *WaitSet) Wait(timeout int64) error {
+	var ret = cwrap.RclWait(w.rclWaitSet, timeout)
+	if ret != cwrap.Ok {
+		return NewErr("RclWaitSetClear", ret)
+	}
 	return nil
 }

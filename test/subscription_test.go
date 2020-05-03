@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/richardrigby/rclgo"
-	"github.com/richardrigby/rclgo/types"
+	"github.com/rclgo/rclgo"
+	"github.com/rclgo/stdmsgs"
 )
 
 func TestSubscription(t *testing.T) {
@@ -27,46 +27,26 @@ func TestSubscription(t *testing.T) {
 			msg <- s
 		}
 	}()
+
 	// Initialization
-	ctx := rclgo.NewZeroInitializedContext()
-	err := ctx.Init()
+	myNode, err := rclgo.NewNode("GoSubscriber", "")
 	if err != nil {
-		t.Fatalf("rcl.Init: %s", err)
-	}
-	myNode := rclgo.NewZeroInitializedNode()
-	myNodeOpts := rclgo.NewNodeDefaultOptions()
-
-	fmt.Printf("Creating the node! \n")
-	err = myNode.Init("GoSubscriber", "", ctx, myNodeOpts)
-	if err != nil {
-		t.Fatalf("NodeInit: %s", err)
+		t.Fatalf("rclgo.NewNode(): %s", err)
 	}
 
-	//Create the subscriptor
-	mySub := rclgo.NewZeroInitializedSubscription()
-	mySubOpts := rclgo.NewSubscriptionDefaultOptions()
+	// Creating the msg type
+	var myMsg stdmsgs.String
+	myMsg.Init()
 
-	//Creating the type
-	msgType := types.GetMessageTypeFromStdMsgsString()
-
-	fmt.Printf("Creating the subscriber! \n")
-	err = mySub.Init(mySubOpts, myNode, "/myGoTopic", msgType)
+	// Create the subscriptor
+	err = myNode.CreateSubscription(myMsg, "/myGoTopic", func(rm rclgo.RosMessage) { callback(t, rm) })
 	if err != nil {
-		t.Fatalf("SubscriptionsInit: %s", err)
+		t.Fatalf("myNode.CreateSubscription(): %s", err)
 	}
-
-	//Creating the msg type
-	var myMsg types.StdMsgsString
-	myMsg.InitMessage()
 
 loop:
 	for {
-		err = mySub.TakeMessage(&myMsg.MsgInfo, myMsg.GetData())
-		if err == nil {
-			fmt.Printf("(Suscriber) Received %s\n", myMsg.GetDataAsString())
-		}
-
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		select {
 		case <-sigs:
 			fmt.Println("Got shutdown, exiting")
@@ -77,19 +57,30 @@ loop:
 
 	fmt.Printf("Shutting down!! \n")
 
-	myMsg.DestroyMessage()
-	err = mySub.SubscriptionFini(myNode)
+	err = myMsg.Destroy()
 	if err != nil {
-		t.Fatalf("SubscriptionFini: %s", err)
+		t.Fatalf("myMsg.Destroy(): %s", err)
 	}
 
-	err = myNode.Fini()
-	if err != nil {
-		t.Fatalf("NodeFini: %s", err)
+	errs := myNode.Fini()
+	if len(errs) != 0 {
+		var s = "myNode.Fini():\n"
+		for _, err := range errs {
+			s += err.Error() + "\n"
+		}
+		t.Fatalf(s)
 	}
 
-	err = ctx.Shutdown()
+	err = rclgo.Shutdown()
 	if err != nil {
-		t.Fatalf("rcl.Shutdown: %s", err)
+		t.Fatalf("rclgo.Shutdown(): %s", err)
 	}
+}
+
+func callback(t *testing.T, msg rclgo.RosMessage) {
+	str, ok := msg.(stdmsgs.String)
+	if !ok {
+		t.Fatalf("callback msg could not be asserted as stdmsgs.String")
+	}
+	fmt.Println("Received:", str.DataAsString())
 }

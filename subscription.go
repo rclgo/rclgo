@@ -1,22 +1,23 @@
 package rclgo
 
 import (
-	"github.com/richardrigby/rclgo/err"
-	cwrap "github.com/richardrigby/rclgo/internal"
-	"github.com/richardrigby/rclgo/types"
+	cwrap "github.com/rclgo/rclgo/internal"
 )
 
+//
 type Subscription struct {
 	rclSubscription *cwrap.RclSubscription
+	msg             RosMessage
+	callback        func(RosMessage)
 }
 
 type SubscriptionOptions struct {
 	rclSubscriptionOptions *cwrap.RclSubscriptionOptions
 }
 
-func NewZeroInitializedSubscription() Subscription {
+func newZeroInitializedSubscription() Subscription {
 	zeroSubscription := cwrap.RclGetZeroInitializedSubscription()
-	return Subscription{&zeroSubscription}
+	return Subscription{rclSubscription: &zeroSubscription}
 }
 
 func NewSubscriptionDefaultOptions() SubscriptionOptions {
@@ -26,49 +27,49 @@ func NewSubscriptionDefaultOptions() SubscriptionOptions {
 
 func (s *Subscription) Init(
 	subscriptionOptions SubscriptionOptions,
-	node Node,
+	node *Node,
 	topicName string,
-	msg types.MessageTypeSupport,
+	typeSupport MessageTypeSupport,
 ) error {
 
 	ret := cwrap.RclSubscriptionInit(
 		s.rclSubscription,
 		node.rclNode,
-		msg.ROSIdlMessageTypeSupport,
+		typeSupport.RosidlMessageTypeSupport,
 		topicName,
 		subscriptionOptions.rclSubscriptionOptions,
 	)
 
-	if ret != types.Ok {
-		return err.NewErr("RclSubscriptionInit", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclSubscriptionInit", ret)
 	}
 
 	return nil
 }
 
-func (s *Subscription) SubscriptionFini(node Node) error {
+func (s *Subscription) Fini(node Node) error {
 	ret := cwrap.RclSubscriptionFini(
 		s.rclSubscription,
 		node.rclNode,
 	)
 
-	if ret != types.Ok {
-		return err.NewErr("RclSubscriptionFini", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclSubscriptionFini", ret)
 	}
 
 	return nil
 }
 
 //
-func (s *Subscription) TakeMessage(msg *cwrap.RmwMessageInfo, data types.MessageData) error {
-	if msg == nil || s.rclSubscription == nil || data.Data == nil {
-		return err.NewErr("nil", types.Error)
+func (s *Subscription) TakeMessage(msgInfo MessageInfo, data MessageData) error {
+	if s.rclSubscription == nil || data.Data == nil {
+		return NewErr("nil", cwrap.Error)
 	}
 
-	ret := cwrap.RclTake(s.rclSubscription, data.Data, msg)
+	ret := cwrap.RclTake(s.rclSubscription, data.Data, msgInfo.RmwMessageInfo, nil)
 
-	if ret != types.Ok {
-		return err.NewErr("RclTake", ret)
+	if ret != cwrap.Ok {
+		return NewErr("RclTake", ret)
 	}
 
 	return nil

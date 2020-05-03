@@ -5,4 +5,4 @@ package cwrap
 import "C"
 
 //
-type RclSerializedMessage C.rcl_serialized_message_t
+type RosidlMessageTypeSupport C.rosidl_message_type_support_t

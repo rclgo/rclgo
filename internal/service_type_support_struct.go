@@ -4,5 +4,4 @@ package cwrap
 // #include <rcl/rcl.h>
 import "C"
 
-//
-type RclSerializedMessage C.rcl_serialized_message_t
+type RosidlServiceTypeSupport C.rosidl_service_type_support_t

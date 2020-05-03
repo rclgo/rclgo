@@ -1,15 +1,10 @@
-package types
+package cwrap
 
-import (
-	"unsafe"
+// #include <stdint.h>
+import "C"
 
-	cwrap "github.com/richardrigby/rclgo/internal"
-)
+type RclRet C.int32_t
 
-// RCLRetT is a wrapper for `rcl_ret_t` that implements the error interface.
-type RCLRetT int
-
-// Constants used in the framework
 const (
 	Ok                     = 0
 	Error                  = 1
@@ -39,9 +34,9 @@ const (
 	WaitSetFull            = 902
 )
 
-func (r RCLRetT) Error() string { return r.String() }
+func (r RclRet) Error() string { return r.String() }
 
-func (r RCLRetT) String() string {
+func (r RclRet) String() string {
 	switch r {
 	case 0:
 		return "OK"
@@ -99,24 +94,4 @@ func (r RCLRetT) String() string {
 	}
 
 	return "Unknown"
-}
-
-type MessageTypeSupport struct {
-	ROSIdlMessageTypeSupport *cwrap.ROSIdlMessageTypeSupport
-}
-
-type MessageData struct {
-	Data unsafe.Pointer
-}
-
-type Message interface {
-	GetMessage() MessageTypeSupport
-	GetData() MessageData
-	InitMessage()
-	DestroyMessage()
-}
-
-type StdMsgsBase struct {
-	MsgType MessageTypeSupport
-	MsgInfo cwrap.RmwMessageInfo
 }

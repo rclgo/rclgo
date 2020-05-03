@@ -15,9 +15,6 @@ type RclNodeOptions C.rcl_node_options_t
 type RmwNode C.rmw_node_t
 
 //
-type RclGuardCondition C.rcl_guard_condition_t
-
-//
 func RclNodeGetDefaultOptions() RclNodeOptions {
 	var defOpts C.rcl_node_options_t = C.rcl_node_get_default_options()
 	return RclNodeOptions(defOpts)
@@ -36,7 +33,7 @@ func RclNodeInit(
 	namespace string,
 	ctx RclContextPtr,
 	options *RclNodeOptions,
-) int {
+) RclRet {
 	var cName *C.char = C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
 	var cNamespace *C.char = C.CString(namespace)
@@ -50,14 +47,14 @@ func RclNodeInit(
 		(*C.rcl_node_options_t)(options),
 	)
 
-	return int(ret)
+	return RclRet(ret)
 }
 
 //
-func RclNodeFini(node *RclNode) int {
+func RclNodeFini(node *RclNode) RclRet {
 	cNode := (*C.rcl_node_t)(node)
 	ret := C.rcl_node_fini(cNode)
-	return int(ret)
+	return RclRet(ret)
 }
 
 //
@@ -109,22 +106,22 @@ func RclNodeGetOptions(node *RclNode) *RclNodeOptions {
 }
 
 //
-func RclNodeGetDomainID(node *RclNode, domainID *uint) int {
+func RclNodeGetDomainID(node *RclNode, domainID *uint) RclRet {
 	var dom C.ulong
 	var ret C.int = C.rcl_node_get_domain_id(
 		(*C.rcl_node_t)(node),
 		&dom,
 	)
 	*domainID = uint(dom)
-	return int(ret)
+	return RclRet(ret)
 }
 
 //
-func RclNodeAssertLiveliness(node *RclNode) int {
+func RclNodeAssertLiveliness(node *RclNode) RclRet {
 	ret := C.rcl_node_assert_liveliness(
 		(*C.rcl_node_t)(node),
 	)
-	return int(ret)
+	return RclRet(ret)
 }
 
 //

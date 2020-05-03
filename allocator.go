@@ -1,19 +1,19 @@
 package rclgo
 
 import (
-	cwrap "github.com/richardrigby/rclgo/internal"
+	cwrap "github.com/rclgo/rclgo/internal"
 )
 
 type Allocator struct {
 	rclAllocator *cwrap.RclAllocator
 }
 
-func NewZeroInitializedAllocator() Allocator {
+func newZeroInitializedAllocator() Allocator {
 	zeroAllocator := cwrap.RcutilsGetZeroInitializedAllocator()
 	return Allocator{&zeroAllocator}
 }
 
-func NewDefaultAllocator() Allocator {
+func newDefaultAllocator() Allocator {
 	defAllocator := cwrap.RcutilsGetDefaultAllocator()
 	return Allocator{&defAllocator}
 }
